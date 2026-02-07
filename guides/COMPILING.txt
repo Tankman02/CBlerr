@@ -1,0 +1,108 @@
+CBlerr - Release
+
+RU
+---
+Это релизная сборка компилятора языка CBlerr, подготовленная для разработчиков на этом ЯП.
+
+- Содержимое:
+  - `core_release/` - обфусцированные модули компилятора, нативный PyArmor-рантайм и `lexer.exe`.
+  - `examples/` - набор примеров для проверки.
+  - Вспомогательные скрипты для запуска и валидации.
+- Важное: изменение файлов в `Release/` и `Release/core_release/` строго ЗАПРЕЩЕНО. Любые модификации могут нарушить целостность обфускации и привести к отказу загрузки рантайма.
+
+Требования:
+- Windows (x86_64 рекомендуется).
+- Для запуска обфусцированных Python-модулей необходим Python 3.9.13 - `pyarmor_runtime.pyd` собран именно для этой версии.
+- Для генерации нативных исполняемых файлов из C требуется компилятор (MinGW/gcc или MSVC) в PATH.
+
+Быстрая проверка (Windows, из корня репозитория):
+
+```powershell
+Release\core_release\lexer.exe Release\examples\test_simple.cbl > Release\core_release\last_lexer_output.jsonl
+```
+
+Запуск обфусцированного компилятора (требуется Python 3.9):
+
+```powershell
+py -3.9 build.py --input Release\examples\test_simple.cbl --output Release\core_release\
+```
+
+EN
+---
+This is the release build of the CBlerr compiler, prepared for distribution to CBlerr language developers.
+
+- Contents:
+  - `core_release/` - obfuscated compiler modules, the native PyArmor runtime and `lexer.exe`.
+  - `examples/` - sample sources used for verification.
+  - Helper scripts for running and validation.
+- Important: modification of files in `Release/` and `Release/core_release/` is strictly PROHIBITED. Modifying obfuscated files or the native runtime may break loading and runtime behavior.
+
+Requirements:
+- Windows (x86_64 recommended).
+- To run the obfuscated Python modules you must use Python 3.9.13 - the included `pyarmor_runtime.pyd` targets this ABI.
+- A C compiler (MinGW/gcc or MSVC) in PATH is required to generate native executables from produced C code.
+
+Quick verification (Windows, from project root):
+
+```powershell
+Release\core_release\lexer.exe Release\examples\test_simple.cbl > Release\core_release\last_lexer_output.jsonl
+```
+
+Running the obfuscated compiler (requires Python 3.9):
+
+```powershell
+py -3.9 build.py --input Release\examples\test_simple.cbl --output Release\core_release\
+```
+
+Rebuild notes (only if necessary):
+- Use Python 3.9.13.
+- You can rebuild `lexer.exe` with PyInstaller if you have source and the correct runtime ABI.
+
+If you want, I can pack `Release/` into a distributable archive or run automated verification across more examples - tell me which you prefer.
+Release package for CBlerr / Пакет релиза для CBlerr
+- A C compiler (MinGW/gcc or MSVC) in PATH is required to generate native executables from produced C code.
+
+Quick verification (Windows, from project root):
+
+```powershell
+Release\core_release\lexer.exe Release\examples\test_simple.cbl > Release\core_release\last_lexer_output.jsonl
+```
+
+Running the obfuscated compiler (requires Python 3.9):
+
+```powershell
+py -3.9 build.py --input Release\examples\test_simple.cbl --output Release\core_release\
+```
+
+Rebuild notes (only if necessary):
+- Use Python 3.9.13.
+- You can rebuild `lexer.exe` with PyInstaller if you have source and the correct runtime ABI.
+
+If you want, I can pack `Release/` into a distributable archive or run automated verification across more examples - tell me which you prefer.
+Release package for CBlerr / Пакет релиза для CBlerr
+
+EN:
+- This release contains an obfuscated `core_release/` with runtime and a tested `lexer.exe`, plus `examples/` used for verification.
+- Important: Files in `Release/` and `Release/core_release/` must NOT be modified. Modification is prohibited.
+
+Quick verification (Windows):
+```
+core_release\lexer.exe examples\test_simple.cbl
+```
+
+RU:
+- В этой папке находится `core_release/` с обфусцированными модулями и необходимым PyArmor-рантаймом, а также `lexer.exe`, проверенное на примерах в `examples/`.
+- ВАЖНО: Файлы в `Release/` и `Release/core_release/` ЗАПРЕЩЕНО ИЗМЕНЯТЬ. Любые изменения могут нарушить целостность обфускации и работоспособность.
+
+Короткое руководство по проверке (Windows):
+```
+core_release\lexer.exe examples\test_simple.cbl
+```
+
+About CBlerr / О CBlerr:
+- EN: CBlerr is a programming language and its reference compiler/runtime are provided in obfuscated form in `core_release/`.
+- RU: CBlerr - это язык программирования (ЯП). В `core_release/` поставляется обфусцированные модули компилятора/рантайма.
+
+License / Ограничения:
+- EN: Modification of the provided obfuscated files is prohibited. Use the package for verification and distribution only.
+- RU: Изменение поставляемых обфусцированных файлов запрещено. Пакет предназначен для проверки и распространения только в поставленном виде.
