@@ -954,7 +954,6 @@ class StandaloneCompiler:
         flags = []
         
         if self.is_windows:
-            # ИСПОЛЬЗУЕМ -nostartfiles ВМЕСТО -nostdlib ЧТОБЫ РАЗРЕШИТЬ МАТЕМАТИКУ (sin, cos)
             flags.append('-nostartfiles')
             flags.append('-Wl,--entry=CblerrStartup')
             
@@ -1190,7 +1189,6 @@ class StandaloneCompiler:
             if self.stack_reserve:
                 msvc_link_flags += f' /STACK:{self.stack_reserve}'
 
-            # ДОБАВЛЕНЫ opengl32.lib И winmm.lib ДЛЯ ЗВУКА И 3D
             libs = ['opengl32.lib', 'winmm.lib', 'kernel32.lib', 'user32.lib', 'msvcrt.lib', 'gdi32.lib']
 
             cmd = [cl_exe] + msvc_compile_flags.split() + srcs + [f'/Fe{self.output_exe}', '/link'] + msvc_link_flags.split() + libs
@@ -1229,7 +1227,6 @@ class StandaloneCompiler:
             srcs = [str(self.c_file)]
             
             if self.is_windows:
-                # ДОБАВЛЕНЫ -lopengl32 И -lwinmm ДЛЯ ЗВУКА И 3D
                 libs = ['-lopengl32', '-lwinmm', '-lmsvcrt', '-lkernel32', '-luser32', '-lgdi32']
             else:
                 libs = ['-lm', '-lc']
