@@ -587,8 +587,8 @@ class CCodeGenerator:
         elif isinstance(expr, Compare):
             left = self.generate_expression(expr.left)
             right = self.generate_expression(expr.right)
-            left_t = getattr(expr.left, 'resolved_type', None)
-            right_t = getattr(expr.right, 'resolved_type', None)
+            left_t = getattr(expr.left, 'resolved_type', getattr(expr.left, 'type', None))
+            right_t = getattr(expr.right, 'resolved_type', getattr(expr.right, 'type', None))
             if left_t == 'str' or right_t == 'str':
                 cmp_map = {
                     '==': '== 0',

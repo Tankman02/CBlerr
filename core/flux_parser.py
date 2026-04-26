@@ -147,7 +147,7 @@ class Parser:
             return name
 
         if token:
-            self.debugger.log_warning(f"Неизвестный токен типа: {token.type} (value={token.value})")
+            raise SyntaxError(f"Неизвестный токен типа: {token.type} (value={token.value}) на линии {token.line}")
             self.advance()
             return token.value
 
@@ -670,7 +670,7 @@ class Parser:
                 self.expect(TokenType.DEDENT, "Ожидается отступ после тела default")
                 cases.append(Case(None, body))
             else:
-                self.debugger.log_warning(f"Непредвиденный токен в теле match: {self.current_token().type}")
+                raise SyntaxError(f"Непредвиденный токен в теле match: {self.current_token().type} на линии {self.current_token().line}")
                 self.advance()
         self.expect(TokenType.DEDENT, "Ожидается отступ после тела match")
         return MatchStmt(expr, cases)
