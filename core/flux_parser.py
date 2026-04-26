@@ -31,12 +31,12 @@ class Parser:
             return t
         return None
 
-    def expect(self, token_type: TokenType, error_msg: str = None, strict: bool = False):
+    def expect(self, token_type: TokenType, error_msg: str = None, strict: bool = True):
         token = self.current_token()
         if not token or token.type != token_type:
-            msg = error_msg or f"Expected {token_type}, got {token.type if token else 'EOF'}"
+            msg = error_msg or f"Ожидался {token_type}, получено {token.type if token else 'EOF'}"
             if strict:
-                raise SyntaxError(f"{msg} at line {token.line if token else '?'}")
+                raise SyntaxError(f"{msg} на линии {token.line if token else '?'}")
             else:
                 self.debugger.log_warning(msg)
                 return token
