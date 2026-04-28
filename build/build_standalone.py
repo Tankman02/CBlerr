@@ -274,7 +274,6 @@ class CCodeGenerator:
             self.global_vars[global_var.name] = global_var
             if hasattr(global_var, 'value') and global_var.value:
                 value_code = self.generate_expression(global_var.value)
-                # Указатель на функцию статичен, если присваиваем имя функции (Variable)
                 if isinstance(global_var.value, (Literal, Variable)):
                     self.emit_line(f"{decl} = {value_code};")
                 else:
@@ -294,7 +293,6 @@ class CCodeGenerator:
         
         if hasattr(global_var, 'value') and global_var.value:
             value_code = self.generate_expression(global_var.value)
-            # Разделяем статику (числа, строки, массивы) и динамику (вызовы функций, операции)
             if isinstance(global_var.value, (Literal, ArrayLiteral, Variable)):
                 if isinstance(c_type, str) and c_type.endswith('[]'):
                     inner = c_type[:-2]
@@ -302,7 +300,6 @@ class CCodeGenerator:
                 else:
                     self.emit_line(f"{c_type} {global_var.name} = {value_code};")
             else:
-                # Откладываем инициализацию динамических значений до запуска программы
                 if isinstance(c_type, str) and c_type.endswith('[]'):
                     inner = c_type[:-2]
                     self.emit_line(f"{inner} {global_var.name}[];")
