@@ -99,7 +99,7 @@ class Parser:
             break
 
         if pos < len(tokens) and tokens[pos].type in (
-            TokenType.ASSIGN, TokenType.PLUS_ASSIGN, TokenType.MINUS_ASSIGN, TokenType.WALRUS
+            TokenType.ASSIGN, TokenType.PLUS_ASSIGN, TokenType.MINUS_ASSIGN
         ):
             return ('assign', pos)
 
@@ -438,7 +438,7 @@ class Parser:
                 left = self.parse_atom_or_access_simple()
                 if not self.current_token():
                     raise SyntaxError('Неожиданный EOF после имени переменной')
-                if self.current_token().type in (TokenType.ASSIGN, TokenType.PLUS_ASSIGN, TokenType.MINUS_ASSIGN, TokenType.WALRUS):
+                if self.current_token().type in (TokenType.ASSIGN, TokenType.PLUS_ASSIGN, TokenType.MINUS_ASSIGN):
                     op = self.current_token().type
                     self.advance()
                     val = self.parse_expression()
@@ -676,7 +676,15 @@ class Parser:
         return MatchStmt(expr, cases)
 
     def parse_expression(self):
-        return self.parse_logical_or()
+        expr = self.parse_logical_or()
+        
+        if self.current_token() and self.current_token().type == TokenType.WALRUS:
+            self.advance()
+            val = self.parse_expression()
+            from core.flux_ast import WalrusExpr
+            return WalrusExpr(expr, val)
+            
+        return expr
 
     def parse_logical_or(self):
         left = self.parse_logical_and()

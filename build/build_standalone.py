@@ -63,7 +63,7 @@ from core.flux_ast import (
     StructDef, FieldAccess, ArrayAccess, ArrayLiteral, LogicalOp,
     PointerType, Dereference, InlineAsm, CastExpr, Decorator, ComptimeBlock
 )
-from core.flux_ast import MatchStmt, Case, ForLoop, EnumDef, AddressOf, SizeOf
+from core.flux_ast import MatchStmt, Case, ForLoop, EnumDef, AddressOf, SizeOf, WalrusExpr
 from core.debugger import init_debugger, get_debugger, DebugLevel
 
 
@@ -83,6 +83,7 @@ class CCodeGenerator:
         self.continue_stack = []
         self.string_counter = 0
         self.local_vars_stack = []
+        self.dynamic_globals =[]
 
     def generate(self, program: Program) -> str:
         if self.link_mode == 'static':
@@ -113,6 +114,12 @@ class CCodeGenerator:
         self.emit_line("#define NULL ((void*)0)")
         self.emit_line("")
         self.emit_line("typedef struct { const char* data; int64_t length; } flux_string;")
+        self.emit_line("extern int memcmp(const void*, const void*, size_t);") 
+        self.emit_line("static inline bool flux_string_eq(flux_string a, flux_string b) {")
+        self.emit_line("    if (a.length != b.length) return false;")
+        self.emit_line("    if (a.length == 0) return true;")
+        self.emit_line("    return memcmp(a.data, b.data, (size_t)a.length) == 0;")
+        self.emit_line("}") 
         self.emit_line("")
         
         self.emit_line("#if defined(_WIN32) || defined(__WIN32__)")
@@ -208,11 +215,16 @@ class CCodeGenerator:
                 self.emit_line("")
                 
         self.emit_line("")
+        self.emit_line("void CblerrInitGlobals(void) {")
+        for name, val_code in self.dynamic_globals:
+            self.emit_line(f"    {name} = {val_code};")
+        self.emit_line("}")
+        
         self.emit_line("#if defined(_WIN32) || defined(__WIN32__)")
         if self.is_gui_app:
-            self.emit_line("void CblerrStartup(void) { WinMain(GetModuleHandleA(NULL), NULL, (void*)\"\", 5); ExitProcess(0); }")
+            self.emit_line("void CblerrStartup(void) { CblerrInitGlobals(); WinMain(GetModuleHandleA(NULL), NULL, (void*)\"\", 5); ExitProcess(0); }")
         else:
-            self.emit_line("void CblerrStartup(void) { main(); ExitProcess(0); }")
+            self.emit_line("void CblerrStartup(void) { CblerrInitGlobals(); main(); ExitProcess(0); }")
         self.emit_line("#endif")
         
         return "\n".join(self.code_lines)
@@ -262,23 +274,41 @@ class CCodeGenerator:
             self.global_vars[global_var.name] = global_var
             if hasattr(global_var, 'value') and global_var.value:
                 value_code = self.generate_expression(global_var.value)
-                self.emit_line(f"{decl} = {value_code};")
+                # Указатель на функцию статичен, если присваиваем имя функции (Variable)
+                if isinstance(global_var.value, (Literal, Variable)):
+                    self.emit_line(f"{decl} = {value_code};")
+                else:
+                    self.emit_line(f"{decl};")
+                    self.dynamic_globals.append((global_var.name, value_code))
             else:
                 self.emit_line(f"{decl};")
             return
+            
         c_type = self.get_c_type(global_var.var_type)
         if hasattr(global_var, 'var_type') and hasattr(global_var.var_type, 'name') and getattr(global_var.var_type, 'name', None) == 'array':
             inner = global_var.var_type.args[0] if getattr(global_var.var_type, 'args', None) else 'int'
             inner_c = self.get_c_type(inner)
             c_type = f"{inner_c}[]"
+            
         self.global_vars[global_var.name] = global_var
+        
         if hasattr(global_var, 'value') and global_var.value:
             value_code = self.generate_expression(global_var.value)
-            if isinstance(c_type, str) and c_type.endswith('[]'):
-                inner = c_type[:-2]
-                self.emit_line(f"{inner} {global_var.name}[] = {value_code};")
+            # Разделяем статику (числа, строки, массивы) и динамику (вызовы функций, операции)
+            if isinstance(global_var.value, (Literal, ArrayLiteral, Variable)):
+                if isinstance(c_type, str) and c_type.endswith('[]'):
+                    inner = c_type[:-2]
+                    self.emit_line(f"{inner} {global_var.name}[] = {value_code};")
+                else:
+                    self.emit_line(f"{c_type} {global_var.name} = {value_code};")
             else:
-                self.emit_line(f"{c_type} {global_var.name} = {value_code};")
+                # Откладываем инициализацию динамических значений до запуска программы
+                if isinstance(c_type, str) and c_type.endswith('[]'):
+                    inner = c_type[:-2]
+                    self.emit_line(f"{inner} {global_var.name}[];")
+                else:
+                    self.emit_line(f"{c_type} {global_var.name};")
+                self.dynamic_globals.append((global_var.name, value_code))
         else:
             if isinstance(c_type, str) and c_type.endswith('[]'):
                 inner = c_type[:-2]
@@ -590,16 +620,14 @@ class CCodeGenerator:
             left_t = getattr(expr.left, 'resolved_type', getattr(expr.left, 'type', None))
             right_t = getattr(expr.right, 'resolved_type', getattr(expr.right, 'type', None))
             if left_t == 'str' or right_t == 'str':
-                cmp_map = {
-                    '==': '== 0',
-                    '!=': '!= 0',
-                    '<': '< 0',
-                    '>': '> 0',
-                    '<=': '<= 0',
-                    '>=': '>= 0'
-                }
-                suffix = cmp_map.get(expr.op, f"== 0")
-                return f"(strcmp({left}.data, {right}.data) {suffix})"
+                if expr.op == '==':
+                    return f"flux_string_eq({left}, {right})"
+                elif expr.op == '!=':
+                    return f"(!flux_string_eq({left}, {right}))"
+                else:
+                    cmp_map = {'<': '< 0', '>': '> 0', '<=': '<= 0', '>=': '>= 0'}
+                    suffix = cmp_map.get(expr.op, f"== 0")
+                    return f"(strcmp({left}.data, {right}.data) {suffix})"
             else:
                 op_map = {
                     '<': '<', '>': '>', '<=': '<=', '>=': '>=',
@@ -707,6 +735,11 @@ class CCodeGenerator:
             else:
                 inner = self.generate_expression(tgt)
                 return f"sizeof({inner})"
+
+        elif isinstance(expr, WalrusExpr):
+            target = self.generate_expression(expr.target)
+            val = self.generate_expression(expr.value)
+            return f"({target} = {val})"
         
         else:
             return "0"
@@ -990,20 +1023,20 @@ class StandaloneCompiler:
 
     def _handle_compile_error(self, error_output: str, debugger) -> bool:
         try:
-            if "undefined reference" in error_output or "ld returned 1" in error_output:
+            if "undefined reference" in error_output or "ld returned 1" in error_output or "неопределенная ссылка" in error_output:
                 print(f"\n\033[31m[ОШИБКА ЛИНКЕРА (ld)]\033[0m\n{error_output.strip()}", file=sys.stderr)
                 return True
 
-            if 'implicit declaration of function' in error_output.lower():
-                m = re.search(r"implicit declaration of function '([^']+)'", error_output, flags=re.I)
-                if m:
-                    func_name = m.group(1)
-                    source = None
-                    if self.source_file.exists():
-                        with open(self.source_file, 'r', encoding='utf-8') as f:
-                            source = f.read()
-                    
-                    lines = source.splitlines() if source else []
+            m_implicit = re.search(r"(?:implicit declaration of function|неявное объявление функции) ['‘]([^'’]+)['’]", error_output, flags=re.I)
+            if m_implicit:
+                func_name = m_implicit.group(1)
+                source = None
+                if self.source_file.exists():
+                    with open(self.source_file, 'r', encoding='utf-8') as f:
+                        source = f.read()
+                
+                if source:
+                    lines = source.splitlines()
                     for line_num, line in enumerate(lines, 1):
                         if func_name in line:
                             exc = SyntaxError(f"Неизвестная функция '{func_name}'")
@@ -1011,16 +1044,15 @@ class StandaloneCompiler:
                             exc.offset = line.find(func_name) + 1
                             debugger.display_syntax_error(exc, source=source, filename=str(self.source_file))
                             return True
-                return True
-            
+
             source = None
             if self.source_file.exists():
                 with open(self.source_file, 'r', encoding='utf-8') as f:
                     source = f.read()
-            
-            m = re.search(r"error:\s*'([^']+)'", error_output)
-            if m and source:
-                identifier = m.group(1)
+
+            m_ident = re.search(r"(?:error|ошибка):\s*['‘]([^'’]+)['’]", error_output, flags=re.I)
+            if m_ident and source:
+                identifier = m_ident.group(1)
                 lines = source.splitlines()
                 for line_num, line in enumerate(lines, 1):
                     if identifier in line:
@@ -1030,31 +1062,22 @@ class StandaloneCompiler:
                         debugger.display_syntax_error(exc, source=source, filename=str(self.source_file))
                         return True
             
-            if m and source is None:
-                identifier = m.group(1)
-                debugger.display_syntax_error(
-                    SyntaxError(f"Неизвестный идентификатор '{identifier}'"),
-                    source=source,
-                    filename=str(self.source_file)
-                )
-                return True
-            
-            m = re.search(r"error:\s*(.+?)(?:\n|$)", error_output)
-            if m:
-                msg = m.group(1).strip()
+            m_msg = re.search(r"(?:error|ошибка):\s*(.+?)(?:\n|$)", error_output, flags=re.I)
+            if m_msg:
+                msg = m_msg.group(1).strip()
                 if source:
-                    debugger.display_syntax_error(
-                        SyntaxError(msg),
-                        source=source,
-                        filename=str(self.source_file)
-                    )
+                    debugger.display_syntax_error(SyntaxError(msg), source=source, filename=str(self.source_file))
                     return True
                 else:
                     print(f"[ОШИБКА] {msg}", file=sys.stderr)
                     return True
+                   
         except Exception:
             pass
-        return False
+        
+        if error_output.strip():
+            print(f"\n\033[31m[СЫРАЯ ОШИБКА КОМПИЛЯТОРА GCC]\033")
+                
     
     def compile(self) -> bool:
         debugger = init_debugger(DebugLevel.INFO)

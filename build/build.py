@@ -5,7 +5,7 @@ from pathlib import Path
 
 def main():
     current_dir = Path(__file__).parent.resolve()
-    target_script = current_dir / "build_standalone.py" #chito negro fazber? Idk 
+    target_script = current_dir / "build_standalone.py" #chito meowly fazber? Idk 
 
     command = [sys.executable, str(target_script)] + sys.argv[1:]
 

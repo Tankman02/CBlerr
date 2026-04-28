@@ -34,6 +34,11 @@ class LogicalOp:
     right: Any | None = None
 
 @dataclass
+class WalrusExpr:
+    target: Any
+    value: Any
+
+@dataclass
 class Assign:
     target: str
     value: Any
